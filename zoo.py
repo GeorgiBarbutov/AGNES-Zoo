@@ -1,8 +1,8 @@
 import pandas as pd
-import copy
+import os
 
 def import_data():
-    return  pd.read_csv("C:\\Users\\Barbuta\\Desktop\\zoo\\data.csv", header=None)
+    return  pd.read_csv(os.getcwd() + "/data.csv", header=None)
 
 #calculates distance between 2 entries in data_values
 def calculate_distance(animal1, animal2):
@@ -119,7 +119,7 @@ def print_results(clusters):
 data = import_data()
 data_values = data.values
 
-linkage = "single"
+linkage = "complete"
 max_clusters = 7
 
 clusters = AGNES(linkage, max_clusters, data_values)
