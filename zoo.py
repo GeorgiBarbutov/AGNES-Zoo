@@ -1,7 +1,6 @@
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-from scipy.cluster.hierarchy import dendrogram
 from scipy.cluster import hierarchy
 
 def import_data():
@@ -38,7 +37,7 @@ def average_linkage(cluster1, cluster2, data_values):
     for i in cluster1[1:]:
         for j in cluster2[1:]:
             sum += calculate_distance(data_values[i], data_values[j])
-    return sum/(len(cluster1)*len(cluster2))
+    return sum / ((len(cluster1) - 1) * (len(cluster2) - 1))
 
 #calculates distance_matrix based on the chosen linkage function
 def get_distance_matrix(data_values, clusters, linkage):
@@ -90,6 +89,7 @@ def AGNES(linkage, max_clusters, data_values):
     distance_matrix = get_distance_matrix(data_values, clusters, linkage)
     cluster_count = len(clusters)
     last_cluster_index = cluster_count
+    print(last_cluster_index)
     Z = []
     while cluster_count > max_clusters:
         distance, i, j = minimum_distance(distance_matrix)
@@ -98,8 +98,7 @@ def AGNES(linkage, max_clusters, data_values):
         last_cluster_index += 1
         distance_matrix = get_distance_matrix(data_values, clusters, linkage)
         cluster_count -= 1
-    print(distance_matrix)
-    return Z
+    return (clusters, Z)
 
 #prints resulting clusters and calculates misclasification percent
 def print_results(clusters):
@@ -110,7 +109,7 @@ def print_results(clusters):
         types = {}
         for j in range(0, max_clusters):
             types[j] = 0
-        for j in i:
+        for j in i[1:]:
             animals.append((data_values[j][0], data_values[j][len(data_values[j]) - 1]))
             types[data_values[j][len(data_values[j]) - 1] - 1] += 1
         
@@ -133,10 +132,10 @@ data_values = data.values
 linkage = "average"
 max_clusters = 1
 
-Z = AGNES(linkage, max_clusters, data_values)
-print(len(Z))
-dn = hierarchy.dendrogram(Z)
-
-plt.show()
+clusters, Z = AGNES(linkage, max_clusters, data_values)
 
 #print_results(clusters)
+
+hierarchy.dendrogram(Z)
+plt.show()
+
