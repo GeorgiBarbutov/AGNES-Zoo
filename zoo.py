@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 from scipy.cluster import hierarchy
 
 def import_data():
@@ -15,7 +16,7 @@ def calculate_distance(animal1, animal2):
     return distance  
 
 def complete_linkage(cluster1, cluster2, data_values):
-    max = -1
+    max = -np.inf
     for i in cluster1[1:]:
         for j in cluster2[1:]:
             distance = calculate_distance(data_values[i], data_values[j])
@@ -24,7 +25,7 @@ def complete_linkage(cluster1, cluster2, data_values):
     return max
 
 def single_linkage(cluster1, cluster2, data_values):
-    min = 10000
+    min = np.inf
     for i in cluster1[1:]:
         for j in cluster2[1:]:
             distance = calculate_distance(data_values[i], data_values[j])
@@ -66,7 +67,7 @@ def create_clusters(data_values):
 #finds the closest clusters, min_i, min_j are the indexes in the clusters list
 #min is the distance
 def minimum_distance(distance_matrix):
-    min = 10000
+    min = np.inf
     min_i = -1 
     min_j = -1
     for i in range(len(distance_matrix)):
@@ -84,30 +85,66 @@ def combine_clusters(clusters, i, j, last_cluster_index):
     clusters[i].extend(clusters[j])
     clusters[i].insert(0, last_cluster_index)
     clusters.remove(clusters[j])
+    
+def calculate_silhouette(clusters, initial_distance_matrix):
+    cluster_s = []
+    for i in range(0, len(clusters)):
+        cluster = clusters[i]
+        s = []
+        for j in cluster[1:]:
+            if len(cluster) == 2:
+                s.append(0)
+                break
+            sum = 0
+            for k in cluster[1:]:
+                if j != k:
+                    sum += initial_distance_matrix[j][k]
+            a = sum / (len(cluster) - 2)
+            
+            min_mean_distance = np.inf
+            for k in range(0, len(clusters)):
+                if i != k:
+                    sum = 0
+                    cluster2 = clusters[k]
+                    for l in cluster2[1:]:
+                        sum += initial_distance_matrix[j][l]
+                    mean_distance = sum / (len(cluster2) - 1)
+                    if mean_distance < min_mean_distance:
+                        min_mean_distance = mean_distance
+            b = min_mean_distance         
+            if a == 0 and b == 0:
+                s.append(0)
+            else:
+                s.append((b - a) / max(a, b))
+        sum = 0
+        for j in range(0, len(s)):
+            sum += s[j]
+        cluster_s.append(sum / len(s))
+    sum = 0
+    for i in range(0, len(cluster_s)):
+        sum += cluster_s[i]
+    return sum / len(cluster_s)
 
-def AGNES(linkage, max_clusters, data_values, stop_at_25 = False):
+def AGNES(linkage, max_clusters, data_values):
     clusters = create_clusters(data_values)
     distance_matrix = get_distance_matrix(data_values, clusters, linkage)
+    initial_distance_matrix = distance_matrix
     cluster_count = len(clusters)
     last_cluster_index = cluster_count
     Z = []
     while cluster_count > max_clusters:
         distance, i, j = minimum_distance(distance_matrix)
-        if stop_at_25 and distance >= len(data_values[0]) / 4:
-            break
         Z.append([clusters[i][0], clusters[j][0], float(distance), len(clusters[i]) + len(clusters[j]) - 2])
         combine_clusters(clusters, i, j, last_cluster_index)
         last_cluster_index += 1
         distance_matrix = get_distance_matrix(data_values, clusters, linkage)
         cluster_count -= 1
-    return (clusters, Z)
+    silhouette = calculate_silhouette(clusters, initial_distance_matrix)
+    return (clusters, Z, silhouette)
 
 #prints resulting clusters and calculates misclasification percent
-def print_results(clusters, stop_at_25):
-    if(stop_at_25):
-        print(f"linkage: {linkage}, stop at 25% difference: {stop_at_25}")
-    else:
-        print(f"linkage: {linkage}, max clusters: {len(clusters)}")
+def print_results(clusters, silhouette):
+    print(f"linkage: {linkage}, max clusters: {len(clusters)}, silhouette: {silhouette}")
     total_accuracy = 0
     for i in clusters:  
         animals = []
@@ -121,7 +158,7 @@ def print_results(clusters, stop_at_25):
             if types[j] > max_type:
                 max_type = types[j]
                 max_type_index = j
-        accuracy = types[max_type_index]/len(animals)*100
+        accuracy = types[max_type_index] / len(animals) * 100
         total_accuracy += accuracy
         print()
         print(f"{animals} - highest: {accuracy}% of {max_type_index + 1}" )
@@ -138,23 +175,23 @@ def trim_input_data(data):
         trimmed_data_values.append(trimmed)
     return trimmed_data_values
 
+def draw_dendrogram(data, Z):
+    label_list = []
+    for i in range(0, len(data.values)):
+        label_list.append(data.values[i][0])
+    hierarchy.dendrogram(Z, labels=label_list)
+    plt.show()
+
 data = import_data()
 data_values = trim_input_data(data)
 
-linkage = "complete"
+linkage = "average"
 max_clusters = 1
-#Algorithm should stop when there is more then 25% difference between the distances 
-#in all of the remaining clusters
-stop_at_25 = False
 
-clusters, Z = AGNES(linkage, max_clusters, data_values, stop_at_25)
+clusters, Z, silhouette = AGNES(linkage, max_clusters, data_values)
 
-print_results(clusters, stop_at_25)
+print_results(clusters, silhouette)
 
-#only draws diagrams when max_clusters = 1 and does not stop prematurely
-label_list = []
-for i in range(0, len(data.values)):
-    label_list.append(data.values[i][0])
-hierarchy.dendrogram(Z, labels=label_list)
-plt.show()
+#only draws diagrams when max_clusters = 1
+draw_dendrogram(data, Z)
 
